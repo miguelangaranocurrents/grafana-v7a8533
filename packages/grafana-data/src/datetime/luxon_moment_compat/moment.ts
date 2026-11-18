@@ -758,7 +758,9 @@ function normalizeZone(zone: string | Zone): Zone {
   }
 
   const name = normalizeZoneName(zone);
-  if (name === 'UTC') {
+  // moment-timezone has no data for unknown zones (e.g. Grafana's 'default') and leaves the moment in UTC
+  // rather than producing an invalid date, so mirror that.
+  if (name === 'UTC' || !IANAZone.isValidZone(name)) {
     return FixedOffsetZone.instance(0);
   }
 
@@ -1030,6 +1032,12 @@ class MomentCompat implements MomentLike {
   tz(zone?: string, keepLocalTime = false): string | undefined | MomentLike {
     if (zone == null) {
       return this._dt.zoneName ?? undefined;
+    }
+
+    // moment-timezone keeps the moment unchanged when asked to switch to an unknown zone
+    const name = normalizeZoneName(zone);
+    if (name !== 'UTC' && !IANAZone.isValidZone(name)) {
+      return this;
     }
 
     return this._setDt(this._dt.setZone(normalizeZone(zone), { keepLocalTime }));
